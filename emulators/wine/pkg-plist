@@ -1436,6 +1436,7 @@ lib/wine/%%WINEARCH%%-unix/crypt32.so
 lib/wine/%%WINEARCH%%-unix/ctapi32.so
 lib/wine/%%WINEARCH%%-unix/dnsapi.so
 lib/wine/%%WINEARCH%%-unix/dwrite.so
+lib/wine/%%WINEARCH%%-unix/kerberos.so
 lib/wine/%%WINEARCH%%-unix/libaclui.a
 lib/wine/%%WINEARCH%%-unix/libactiveds.a
 lib/wine/%%WINEARCH%%-unix/libadsiid.a
@@ -1990,6 +1991,7 @@ lib/wine/%%WINEARCH%%-windows/itss.dll
 lib/wine/%%WINEARCH%%-windows/joy.cpl
 lib/wine/%%WINEARCH%%-windows/jscript.dll
 lib/wine/%%WINEARCH%%-windows/jsproxy.dll
+lib/wine/%%WINEARCH%%-windows/kerberos.dll
 lib/wine/%%WINEARCH%%-windows/kernel32.dll
 lib/wine/%%WINEARCH%%-windows/kernelbase.dll
 %%WINE32%%lib/wine/%%WINEARCH%%-windows/keyboard.drv16

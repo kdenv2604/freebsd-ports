@@ -1,0 +1,120 @@
+--- dlls/kerberos/krb5_ap.c
++++ dlls/kerberos/krb5_ap.c
+@@ -419,6 +419,14 @@
+            logon_id, auth_data, get_key_fn, get_key_arg, credential, expiry );
+ 
+     if (principal_us && !(principal = get_str_unixcp( principal_us ))) return SEC_E_INSUFFICIENT_MEMORY;
++
++    /* A zero-initialized Unicode identity supplies no explicit credentials.
++       Use the ticket cache, as when the caller supplies no identity at all. */
++    if (id && id->Flags == SEC_WINNT_AUTH_IDENTITY_UNICODE &&
++        !id->User && !id->UserLength && !id->Domain && !id->DomainLength &&
++        !id->Password && !id->PasswordLength)
++        id = NULL;
++
+     if (id)
+     {
+         if (id->Flags & SEC_WINNT_AUTH_IDENTITY_ANSI)
+@@ -438,13 +446,18 @@
+     }
+ 
+     {
++        BOOL allow_deferred = credential_use == SECPKG_CRED_OUTBOUND &&
++                              !principal_us && !id && !logon_id && !get_key_fn && !get_key_arg;
+         struct acquire_credentials_handle_params params = { principal, credential_use, username, password,
+-                                                            &cred_handle->handle, &exptime };
++                                                            &cred_handle->handle, &exptime, allow_deferred };
+         if (!(status = KRB5_CALL( acquire_credentials_handle, &params )))
++        {
+             *credential = (LSA_SEC_HANDLE)cred_handle;
++            if (cred_handle->handle) expiry_to_timestamp( exptime, expiry );
++            else if (expiry) expiry->LowPart = expiry->HighPart = 0;
++        }
+         else
+             free( cred_handle );
+-        expiry_to_timestamp( exptime, expiry );
+     }
+ 
+ done:
+@@ -458,14 +471,17 @@
+ {
+     struct cred_handle *cred_handle = (void *)credential;
+     struct free_credentials_handle_params params;
+-    NTSTATUS status;
++    NTSTATUS status = SEC_E_OK;
+ 
+     TRACE( "%Ix\n", credential );
+ 
+     if (!cred_handle) return SEC_E_INVALID_HANDLE;
+ 
+-    params.credential = cred_handle->handle;
+-    status = KRB5_CALL( free_credentials_handle, &params );
++    if (cred_handle->handle)
++    {
++        params.credential = cred_handle->handle;
++        status = KRB5_CALL( free_credentials_handle, &params );
++    }
+     free(cred_handle);
+     return status;
+ }
+@@ -497,6 +513,7 @@
+         UINT64 new_context_handle = 0;
+         int idx;
+ 
++        /* GSS resolves the default initiator credentials if there is no Unix handle yet. */
+         params.credential = cred_handle ? cred_handle->handle : 0;
+         params.context = context_handle ? context_handle->handle : 0;
+         params.target_name = target;
+@@ -572,6 +589,9 @@
+         struct context_handle *context_handle = (struct context_handle *)context;
+         struct accept_context_params params = { 0 };
+         UINT64 new_context_handle = 0;
++
++        /* A deferred outbound credential does not authorize an acceptor. */
++        if (cred_handle && !cred_handle->handle) return SEC_E_NO_CREDENTIALS;
+ 
+         params.credential = cred_handle ? cred_handle->handle : 0;
+         params.context = context_handle ? context_handle->handle : 0;
+--- dlls/kerberos/unixlib.h
++++ dlls/kerberos/unixlib.h
+@@ -44,6 +44,7 @@
+     const char *password;
+     UINT64 *credential;
+     ULONG *expiry;
++    BOOL allow_deferred;
+ };
+ 
+ struct delete_context_params
+--- dlls/kerberos/unixlib.c
++++ dlls/kerberos/unixlib.c
+@@ -681,6 +681,14 @@
+         credhandle_gss_to_sspi( cred_handle, params->credential );
+         *params->expiry = expiry_time;
+     }
++    else if (ret == GSS_S_NO_CRED && params->allow_deferred)
++    {
++        /* Windows can acquire a default outbound handle before credentials are available.
++         * Only InitializeSecurityContext resolves it; no GSS credential is owned here. */
++        *params->credential = 0;
++        *params->expiry = 0;
++        ret = GSS_S_COMPLETE;
++    }
+ 
+     if (name != GSS_C_NO_NAME) pgss_release_name( &minor_status, &name );
+     return status_gss_to_sspi( ret );
+@@ -1180,6 +1188,7 @@
+         PTR32 password;
+         PTR32 credential;
+         PTR32 expiry;
++        BOOL allow_deferred;
+     } const *params32 = args;
+     struct acquire_credentials_handle_params params =
+     {
+@@ -1189,6 +1198,7 @@
+         ULongToPtr(params32->password),
+         ULongToPtr(params32->credential),
+         ULongToPtr(params32->expiry),
++        params32->allow_deferred,
+     };
+     return acquire_credentials_handle( &params );
+ }

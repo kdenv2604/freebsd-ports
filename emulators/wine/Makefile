@@ -1,6 +1,6 @@
 PORTNAME=	wine
 DISTVERSION=	11.0
-PORTREVISION=	2
+PORTREVISION=	5
 PORTEPOCH=	1
 CATEGORIES=	emulators
 MASTER_SITES=	https://dl.winehq.org/wine/source/11.0/
@@ -19,7 +19,7 @@ BUILD_DEPENDS=	${LOCALBASE}/bin/flex:textproc/flex
 LIB_DEPENDS=	libhwloc.so:devel/hwloc2
 
 # Only devel/llvm17 and later come with necessary include files - PR274542
-USES=		bison cpe desktop-file-utils gmake \
+USES=		bison cpe desktop-file-utils gmake gssapi:mit \
 		llvm:min=17,build,noexport localbase \
 		pkgconfig sdl shebangfix tar:xz
 CPE_VENDOR=	winehq
@@ -31,17 +31,17 @@ SHEBANG_FILES=	tools/make_requests tools/winemaker/winemaker \
 		tools/winedump/function_grep.pl
 GNU_CONFIGURE=	yes
 CONFIGURE_ARGS=	--verbose \
-		--disable-kerberos \
+		--enable-kerberos \
 		--disable-tests \
 		--without-capi \
 		--without-coreaudio \
 		--without-dbus \
 		--without-gettext --without-gettextpo \
 		--without-gphoto \
-		--without-gssapi \
+		--with-gssapi \
 		--with-hwloc \
 		--without-inotify \
-		--without-krb5 \
+		--with-krb5 \
 		--with-mingw CROSSCC="clang" \
 		--without-netapi \
 		--without-opencl \
@@ -54,7 +54,8 @@ CONFIGURE_ARGS=	--verbose \
 		--without-udev \
 		--without-unwind \
 		--without-usb
-CONFIGURE_ENV=	CPPBIN="${CPP}" FLEX="${LOCALBASE}/bin/flex"
+CONFIGURE_ENV=	CPPBIN="${CPP}" FLEX="${LOCALBASE}/bin/flex" \
+		KRB5_CONFIG="${KRB5CONFIG}"
 
 PIE_UNSAFE=	yes
 
